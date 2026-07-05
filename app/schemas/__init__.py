@@ -1,9 +1,10 @@
-"""Pydantic schemas — REST DTOs and the mappers between REST and domain models."""
+"""Pydantic schemas: REST DTOs and mappers between REST and domain models."""
 from datetime import datetime
+import enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.models.entities import Task, User
+from app.models.entities import SummaryTask, Task, User
 from app.models.enums import Priority
 
 
@@ -12,7 +13,7 @@ from app.models.enums import Priority
 # ------------------------------------------------------------------
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=72)
     full_name: str | None = Field(default=None, max_length=255)
 
 
@@ -27,12 +28,22 @@ class UserRead(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=72)
 
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class AuthResponse(BaseModel):
+    message: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
+    logout_all: bool = False
 
 
 # ------------------------------------------------------------------
@@ -88,11 +99,43 @@ class TaskRead(BaseModel):
     updated_at: datetime
 
 
+class SummaryTaskCreate(BaseModel):
+    summary: str = Field(min_length=1)
+
+
+class SummaryTaskRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    all_task: str
+
+
+# ------------------------------------------------------------------
+# AI task creation schemas
+# ------------------------------------------------------------------
+class TaskCreationType(str, enum.Enum):
+    HOBBIES = "hobbies"
+    WORK = "work"
+
+
+class TaskCreationCreate(BaseModel):
+    type: TaskCreationType
+
+
+class GeneratedTaskIdea(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str = Field(min_length=1)
+
+
 # ------------------------------------------------------------------
 # Mappers: REST <-> ORM model
 # ------------------------------------------------------------------
 def task_to_read(task: Task) -> TaskRead:
     return TaskRead.model_validate(task)
+
+
+def summary_task_to_read(summary_task: SummaryTask) -> SummaryTaskRead:
+    return SummaryTaskRead.model_validate(summary_task)
 
 
 def user_to_read(user: User) -> UserRead:
@@ -108,6 +151,10 @@ def task_create_to_model(data: TaskCreate, user_id: int) -> Task:
         end_date=data.end_date,
         priority=data.priority,
     )
+
+
+def summary_task_create_to_model(data: SummaryTaskCreate) -> SummaryTask:
+    return SummaryTask(all_task=data.summary)
 
 
 def apply_task_update(task: Task, data: TaskUpdate) -> Task:

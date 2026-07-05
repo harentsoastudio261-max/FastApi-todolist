@@ -1,17 +1,21 @@
-"""Task router — maps HTTP endpoints to the task controller."""
+"""Task router - maps HTTP endpoints to the task controller."""
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import get_current_user, get_manager
 from app.controllers.task_controller import TaskController
 from app.managers import ServiceManager
 from app.models.entities import User
-from app.schemas import TaskCreate, TaskRead, TaskUpdate
+from app.schemas import SummaryTaskCreate, SummaryTaskRead, TaskCreate, TaskRead, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 def _controller(manager: ServiceManager = Depends(get_manager), current_user: User = Depends(get_current_user)) -> TaskController:
     return TaskController(manager, current_user)
+
+
+def _summary_controller(manager: ServiceManager = Depends(get_manager)) -> TaskController:
+    return TaskController(manager)
 
 
 @router.get("", response_model=list[TaskRead])
@@ -23,6 +27,11 @@ def list_tasks(controller: TaskController = Depends(_controller)):
 def create_task(data: TaskCreate, controller: TaskController = Depends(_controller)):
     task, _ = controller.create_task(data)
     return task
+
+
+@router.post("/summary", response_model=SummaryTaskRead, status_code=status.HTTP_201_CREATED)
+def create_summary_task(data: SummaryTaskCreate, controller: TaskController = Depends(_summary_controller)):
+    return controller.create_summary_task(data)
 
 
 @router.get("/{task_id}", response_model=TaskRead)
