@@ -51,6 +51,30 @@ class Settings(BaseSettings):
     csrf_cookie_samesite: str = "lax"
     csrf_token_expire_seconds: int = 60 * 60 * 24 * 30
 
+    # Rate limiting. The database-backed limiter is shared by API processes.
+    rate_limit_enabled: bool = True
+    rate_limit_key_secret: str = "change-me-rate-limit-key-secret"
+    rate_limit_login_ip_limit: int = 10
+    rate_limit_login_ip_window_seconds: int = 60
+    rate_limit_login_account_limit: int = 5
+    rate_limit_login_account_window_seconds: int = 15 * 60
+    rate_limit_register_ip_limit: int = 5
+    rate_limit_register_ip_window_seconds: int = 60 * 60
+    rate_limit_register_account_limit: int = 3
+    rate_limit_register_account_window_seconds: int = 60 * 60
+    rate_limit_refresh_ip_limit: int = 30
+    rate_limit_refresh_ip_window_seconds: int = 60
+    rate_limit_refresh_user_limit: int = 20
+    rate_limit_refresh_user_window_seconds: int = 15 * 60
+    rate_limit_summary_ip_limit: int = 10
+    rate_limit_summary_ip_window_seconds: int = 60
+    rate_limit_summary_user_limit: int = 10
+    rate_limit_summary_user_window_seconds: int = 15 * 60
+    rate_limit_ai_ip_limit: int = 10
+    rate_limit_ai_ip_window_seconds: int = 60
+    rate_limit_ai_user_limit: int = 20
+    rate_limit_ai_user_window_seconds: int = 60 * 60
+
     # Database
     # Driver SQLAlchemy pour MySQL avec le connecteur pymysql.
     db_driver: str = "mysql+pymysql"

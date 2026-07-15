@@ -53,6 +53,16 @@ class ForbiddenException(AppException):
     error_code = "forbidden"
 
 
+class RateLimitExceededException(AppException):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    detail = "Too many requests"
+    error_code = "rate_limit_exceeded"
+
+    def __init__(self, retry_after_seconds: int):
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__()
+
+
 # Erreur quand les donnees fournies ne respectent pas les regles attendues.
 # Utile pour des validations applicatives en plus de la validation automatique FastAPI.
 class ValidationException(AppException):

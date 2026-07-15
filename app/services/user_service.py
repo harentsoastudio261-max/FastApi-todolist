@@ -3,6 +3,7 @@ from datetime import datetime
 
 from app.core.exceptions import ConflictException, UnauthorizedException
 from app.core.logging import get_logger
+from app.core.rate_limit import RateLimitScope
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -14,16 +15,24 @@ from app.core.security import (
 from app.models.entities import RefreshToken, User
 from app.repositories import RefreshTokenRepository, UserRepository
 from app.schemas import Token, UserCreate, UserRead, user_to_read
+from app.services.rate_limit_service import RateLimitService
 
 logger = get_logger(__name__)
 
 
 class UserService:
-    def __init__(self, repo: UserRepository, refresh_tokens: RefreshTokenRepository):
+    def __init__(
+        self,
+        repo: UserRepository,
+        refresh_tokens: RefreshTokenRepository,
+        rate_limiter: RateLimitService,
+    ):
         self.repo = repo
         self.refresh_tokens = refresh_tokens
+        self.rate_limiter = rate_limiter
 
     def register(self, data: UserCreate) -> UserRead:
+        self.rate_limiter.enforce(RateLimitScope.REGISTER_ACCOUNT, str(data.email))
         if self.repo.get_by_email(data.email):
             raise ConflictException("Email already registered", "email_taken")
 
@@ -37,6 +46,7 @@ class UserService:
         return user_to_read(user)
 
     def authenticate(self, email: str, password: str) -> Token:
+        self.rate_limiter.enforce(RateLimitScope.LOGIN_ACCOUNT, email)
         user = self.repo.get_by_email(email)
         if not user or not verify_password(password, user.hashed_password):
             raise UnauthorizedException("Incorrect email or password", "bad_credentials")
@@ -52,6 +62,8 @@ class UserService:
         user = self.repo.get_by_id(stored.user_id)
         if user is None:
             raise UnauthorizedException("User no longer exists", "user_not_found")
+
+        self.rate_limiter.enforce(RateLimitScope.REFRESH_USER, str(user.id))
 
         new_refresh_token = generate_refresh_token()
         new_refresh_hash = hash_refresh_token(new_refresh_token)

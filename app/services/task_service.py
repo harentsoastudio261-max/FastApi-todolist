@@ -1,5 +1,6 @@
 """Task service - task business logic (CRUD, ownership rules)."""
 from app.core.logging import get_logger
+from app.core.rate_limit import RateLimitScope
 from app.models.entities import Task
 from app.repositories import TaskRepository
 from app.schemas import (
@@ -14,13 +15,15 @@ from app.schemas import (
     task_create_to_model,
     task_to_read,
 )
+from app.services.rate_limit_service import RateLimitService
 
 logger = get_logger(__name__)
 
 
 class TaskService:
-    def __init__(self, repo: TaskRepository):
+    def __init__(self, repo: TaskRepository, rate_limiter: RateLimitService):
         self.repo = repo
+        self.rate_limiter = rate_limiter
 
     def list_tasks(self, user_id: int) -> list[TaskRead]:
         tasks = self.repo.list_by_user(user_id)
@@ -32,7 +35,8 @@ class TaskService:
         logger.info("Created task id=%s for user id=%s", task.id, user_id)
         return task_to_read(task)
 
-    def create_summary_task(self, data: SummaryTaskCreate) -> SummaryTaskRead:
+    def create_summary_task(self, data: SummaryTaskCreate, user_id: int) -> SummaryTaskRead:
+        self.rate_limiter.enforce(RateLimitScope.SUMMARY_USER, str(user_id))
         summary_task = summary_task_create_to_model(data)
         summary_task = self.repo.add_summary_task(summary_task)
         logger.info("Created summary task id=%s", summary_task.id)

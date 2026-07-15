@@ -25,7 +25,7 @@ class TaskController:
         return task, status.HTTP_201_CREATED
 
     def create_summary_task(self, data: SummaryTaskCreate) -> SummaryTaskRead:
-        return self.manager.task_service.create_summary_task(data)
+        return self.manager.task_service.create_summary_task(data, self._require_current_user_id())
 
     def get_task(self, task_id: int) -> TaskRead:
         return self.manager.task_service.get_task(task_id, self._require_current_user_id())

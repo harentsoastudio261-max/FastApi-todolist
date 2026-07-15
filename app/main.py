@@ -10,9 +10,11 @@ from app.core.database import Base, engine
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import get_logger, setup_logging
 from app.middleware.csrf import CsrfMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.routers.auth_router import router as auth_router
 from app.routers.task_creation_router import router as task_creation_router
 from app.routers.task_router import router as task_router
+from app.services.rate_limit_service import build_rate_limit_service
 from app.workers.summary_task_watcher import run as run_summary_task_watcher
 
 
@@ -69,6 +71,11 @@ app.add_middleware(
     CsrfMiddleware,
     cookie_name=settings.csrf_cookie_name,
     header_name=settings.csrf_header_name,
+)
+
+app.add_middleware(
+    RateLimitMiddleware,
+    rate_limiter=build_rate_limit_service(),
 )
 
 # CORS wraps the CSRF middleware so trusted frontend clients can read 403 JSON errors.

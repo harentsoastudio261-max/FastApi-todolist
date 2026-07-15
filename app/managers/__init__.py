@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.providers.ai.factory import build_task_idea_provider
 from app.repositories import RefreshTokenRepository, TaskRepository, UserRepository
 from app.services.hobbies_task_creation_service import HobbiesTaskCreationService
+from app.services.rate_limit_service import build_rate_limit_service
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
 from app.services.work_task_creation_service import WorkTaskCreationService
@@ -45,6 +46,7 @@ def build_manager(db: Session) -> ServiceManager:
     user_repo = UserRepository(db)
     refresh_token_repo = RefreshTokenRepository(db)
     task_repo = TaskRepository(db)
+    rate_limiter = build_rate_limit_service()
 
     task_idea_provider = build_task_idea_provider(settings)
     hobbies_task_creation_service = HobbiesTaskCreationService(task_repo, task_idea_provider)
@@ -52,11 +54,12 @@ def build_manager(db: Session) -> ServiceManager:
     task_creation_use_case = TaskCreationUseCase(
         hobbies_task_creation_service,
         work_task_creation_service,
+        rate_limiter,
     )
 
     return ServiceManager(
-        user_service=UserService(user_repo, refresh_token_repo),
-        task_service=TaskService(task_repo),
+        user_service=UserService(user_repo, refresh_token_repo, rate_limiter),
+        task_service=TaskService(task_repo, rate_limiter),
         task_creation_use_case=task_creation_use_case,
         db=db,
     )

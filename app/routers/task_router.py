@@ -14,8 +14,11 @@ def _controller(manager: ServiceManager = Depends(get_manager), current_user: Us
     return TaskController(manager, current_user)
 
 
-def _summary_controller(manager: ServiceManager = Depends(get_manager)) -> TaskController:
-    return TaskController(manager)
+def _summary_controller(
+    manager: ServiceManager = Depends(get_manager),
+    current_user: User = Depends(get_current_user),
+) -> TaskController:
+    return TaskController(manager, current_user)
 
 
 @router.get("", response_model=list[TaskRead])
