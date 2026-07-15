@@ -4,7 +4,7 @@ import unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.csrf import CsrfMiddleware
+from app.middleware.csrf import CsrfMiddleware
 
 
 class CsrfMiddlewareTests(unittest.TestCase):
