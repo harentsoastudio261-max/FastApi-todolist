@@ -4,10 +4,11 @@ from fastapi import APIRouter, Body, Cookie, Depends, Response, status
 from app.api.deps import get_current_user, get_manager
 from app.controllers.auth_controller import AuthController
 from app.core.config import settings
+from app.core.csrf import clear_csrf_cookie, issue_csrf_token
 from app.core.exceptions import UnauthorizedException
 from app.managers import ServiceManager
 from app.models.entities import User
-from app.schemas import AuthResponse, LogoutRequest, Token, UserCreate, UserLogin, UserRead
+from app.schemas import AuthResponse, CsrfTokenResponse, LogoutRequest, Token, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -40,6 +41,14 @@ def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(key=settings.refresh_token_cookie_name, path="/")
 
 
+# This safe endpoint lets the trusted SPA obtain a CSRF token before its first write request.
+@router.get("/csrf", response_model=CsrfTokenResponse)
+def csrf(response: Response) -> CsrfTokenResponse:
+    # CSRF bootstrap responses contain a secret and must never be stored by intermediary caches.
+    response.headers["Cache-Control"] = "no-store"
+    return CsrfTokenResponse(csrf_token=issue_csrf_token(response))
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(data: UserCreate, manager: ServiceManager = Depends(get_manager)):
     controller = AuthController(manager)
@@ -56,7 +65,9 @@ def login(
     controller = AuthController(manager)
     tokens = controller.login(data)
     _set_auth_cookies(response, tokens)
-    return AuthResponse(message="Logged in")
+    # Rotate CSRF after authentication so the token is fresh at a privilege boundary.
+    response.headers["Cache-Control"] = "no-store"
+    return AuthResponse(message="Logged in", csrf_token=issue_csrf_token(response))
 
 
 @router.post("/refresh", response_model=AuthResponse)
@@ -71,7 +82,9 @@ def refresh(
     controller = AuthController(manager)
     tokens = controller.refresh(refresh_token)
     _set_auth_cookies(response, tokens)
-    return AuthResponse(message="Session refreshed")
+    # Refresh rotates CSRF together with session cookies to keep the pair synchronized.
+    response.headers["Cache-Control"] = "no-store"
+    return AuthResponse(message="Session refreshed", csrf_token=issue_csrf_token(response))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -90,4 +103,6 @@ def logout(
         )
     )
     _clear_auth_cookies(response)
+    # Logout removes the CSRF cookie too, preventing reuse after the session is closed.
+    clear_csrf_cookie(response)
     return None

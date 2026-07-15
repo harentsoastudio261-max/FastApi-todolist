@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     # Protection navigateur contre l'envoi cross-site des cookies.
     auth_cookie_samesite: str = "lax"
 
+    # CSRF: cookie HttpOnly compare a un en-tete envoye par le frontend de confiance.
+    csrf_cookie_name: str = "csrf_token"
+    csrf_header_name: str = "X-CSRF-Token"
+    csrf_cookie_secure: bool = False
+    csrf_cookie_samesite: str = "lax"
+    csrf_token_expire_seconds: int = 60 * 60 * 24 * 30
+
     # Database
     # Driver SQLAlchemy pour MySQL avec le connecteur pymysql.
     db_driver: str = "mysql+pymysql"

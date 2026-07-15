@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.csrf import CsrfMiddleware
 from app.core.database import Base, engine
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import get_logger, setup_logging
@@ -63,6 +64,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CSRF protects every unsafe HTTP method before it can reach a router/controller.
+app.add_middleware(
+    CsrfMiddleware,
+    cookie_name=settings.csrf_cookie_name,
+    header_name=settings.csrf_header_name,
+)
+
+# CORS wraps the CSRF middleware so trusted frontend clients can read 403 JSON errors.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],

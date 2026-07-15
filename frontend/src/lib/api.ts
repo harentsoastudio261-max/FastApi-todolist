@@ -1,6 +1,8 @@
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const csrfHeaderName = import.meta.env.VITE_CSRF_HEADER_NAME ?? "X-CSRF-Token";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+const unsafeMethods = new Set<HttpMethod>(["POST", "PUT", "PATCH", "DELETE"]);
 
 export class ApiError extends Error {
   status: number;
@@ -12,23 +14,87 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: { method?: HttpMethod; body?: unknown } = {}): Promise<T> {
+// CSRF state stays in memory; the matching browser cookie remains HttpOnly.
+let csrfToken: string | null = null;
+let csrfTokenPromise: Promise<string> | null = null;
+
+
+function readCsrfToken(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const token = (payload as { csrf_token?: unknown }).csrf_token;
+  return typeof token === "string" && token.length > 0 ? token : null;
+}
+
+
+async function loadCsrfToken(): Promise<string> {
+  const response = await fetch(`${baseUrl}/auth/csrf`, { credentials: "include" });
+  const payload = await response.json().catch(() => null);
+  const token = readCsrfToken(payload);
+
+  if (!response.ok || token === null) {
+    throw new ApiError("Unable to initialize CSRF protection", response.status);
+  }
+
+  csrfToken = token;
+  return token;
+}
+
+
+async function getCsrfToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && csrfToken !== null) return csrfToken;
+
+  if (csrfTokenPromise === null) {
+    csrfTokenPromise = loadCsrfToken().finally(() => {
+      csrfTokenPromise = null;
+    });
+  }
+
+  return csrfTokenPromise;
+}
+
+
+function isCsrfFailure(payload: unknown): boolean {
+  if (typeof payload !== "object" || payload === null) return false;
+  const error = (payload as { error?: { code?: unknown } }).error;
+  return error?.code === "csrf_validation_failed";
+}
+
+
+// Every browser write first obtains a matching token, then sends it in the custom CSRF header.
+async function request<T>(
+  path: string,
+  options: { method?: HttpMethod; body?: unknown } = {},
+  retryCsrf = true,
+): Promise<T> {
+  const method = options.method ?? "GET";
+  const needsCsrf = unsafeMethods.has(method);
+  const token = needsCsrf ? await getCsrfToken() : null;
   const response = await fetch(`${baseUrl}${path}`, {
-    method: options.method ?? "GET",
+    method,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(token === null ? {} : { [csrfHeaderName]: token }),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
   const payload = isJson ? await response.json().catch(() => null) : null;
+  const rotatedCsrfToken = readCsrfToken(payload);
+  if (rotatedCsrfToken !== null) csrfToken = rotatedCsrfToken;
 
   if (!response.ok) {
+    if (needsCsrf && retryCsrf && response.status === 403 && isCsrfFailure(payload)) {
+      csrfToken = null;
+      await getCsrfToken(true);
+      return request<T>(path, options, false);
+    }
     const message = payload?.detail || payload?.error?.message || `Request failed (${response.status})`;
     throw new ApiError(message, response.status);
   }
+
+  if (path === "/auth/logout") csrfToken = null;
 
   return payload as T;
 }
@@ -64,6 +130,7 @@ export type SummaryTask = {
 
 export type AuthResponse = {
   message: string;
+  csrf_token: string;
 };
 
 let refreshPromise: Promise<AuthResponse> | null = null;

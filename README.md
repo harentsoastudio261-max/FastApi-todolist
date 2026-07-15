@@ -28,7 +28,7 @@ The `manager` builds the per-request object graph. Controllers depend only on th
 - **manager**: single dependency injected into controllers; makes the app testable end-to-end.
 
 ## Features
-- Bearer-token authentication (JWT, HS256)
+- JWT authentication stored in HttpOnly cookies, with CSRF protection for writes
 - Per-user task CRUD with ownership enforcement
 - Task attributes: `name`, `description`, `start_date`, `end_date`, `priority` (enum: low/medium/high)
 - Validation: `end_date` must be after `start_date`; password >= 8 chars
@@ -63,7 +63,8 @@ Docs at `http://localhost:8000/docs`.
 | Method | Path                | Auth | Description          |
 |--------|---------------------|------|----------------------|
 | POST   | `/auth/register`    | no   | Register a user      |
-| POST   | `/auth/login`       | no   | Get a bearer token    |
+| POST   | `/auth/login`       | no   | Start a cookie session |
+| GET    | `/auth/csrf`        | no   | Bootstrap a CSRF token |
 | GET    | `/tasks`            | yes  | List own tasks        |
 | POST   | `/tasks`            | yes  | Create a task         |
 | GET    | `/tasks/{id}`       | yes  | Get a task            |
@@ -71,7 +72,7 @@ Docs at `http://localhost:8000/docs`.
 | DELETE | `/tasks/{id}`       | yes  | Delete a task         |
 | GET    | `/health`           | no   | Health check          |
 
-Auth: send `Authorization: Bearer <token>` header.
+Auth is carried by HttpOnly cookies. Before every `POST`, `PUT`, `PATCH`, or `DELETE`, the frontend obtains `GET /auth/csrf` and sends the returned value in the `X-CSRF-Token` header. The backend compares that header with its matching HttpOnly CSRF cookie.
 
 ## Error envelope
 All errors return:

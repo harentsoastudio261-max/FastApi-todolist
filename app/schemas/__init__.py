@@ -39,6 +39,12 @@ class Token(BaseModel):
 
 class AuthResponse(BaseModel):
     message: str
+    csrf_token: str
+
+
+# The SPA reads this bootstrap payload, not the HttpOnly CSRF cookie itself.
+class CsrfTokenResponse(BaseModel):
+    csrf_token: str
 
 
 class LogoutRequest(BaseModel):

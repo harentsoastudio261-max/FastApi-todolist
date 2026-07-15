@@ -322,7 +322,6 @@ Ce systeme est plus solide, mais pour une vraie production il faudrait encore aj
 
 - Alembic pour migrer proprement la nouvelle table `refresh_tokens` ;
 - stockage frontend securise selon le type d'application ;
-- protection CSRF si les tokens passent par cookies ;
 - surveillance des refresh tokens reutilises apres rotation ;
 - rate limiting sur `/auth/login` et `/auth/refresh` ;
 - logs de securite plus structures.
